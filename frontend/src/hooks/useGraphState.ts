@@ -54,13 +54,15 @@ function getModelColor(model: string): string {
 
 function estimateNodeHeight(node: InstanceNode): number {
   const attrCount = Math.min(Object.keys(node.attributes).length, 8);
-  const relCount = node.relations.length;
-  return 60 + attrCount * 22 + relCount * 28 + 20;
+  // Relations are collapsed by default, just a toggle row
+  const hasRelations = node.relations.some((r) => r.count > 0);
+  return 60 + attrCount * 22 + (hasRelations ? 30 : 0) + 20;
 }
 
 function instanceToFlowNode(
   instance: InstanceNode,
-  depth: number
+  depth: number,
+  expandedRelNames: string[] = []
 ): Node {
   const opacity = Math.max(0.4, 1 - depth * 0.15);
   return {
@@ -69,6 +71,7 @@ function instanceToFlowNode(
     position: { x: 0, y: 0 },
     data: {
       ...instance,
+      expandedRelations: expandedRelNames,
       depth,
       color: getModelColor(instance.model),
       opacity,
@@ -113,35 +116,7 @@ export function useGraphState(): GraphNodes {
 
         const flowNode = instanceToFlowNode(node, 0);
 
-        // Add relation stub nodes (unexpanded, fog-of-war)
-        const stubNodes: Node[] = [];
-        const stubEdges: Edge[] = [];
-        node.relations.forEach((rel) => {
-          if (rel.count === 0) return;
-          const stubId = `stub:${node.key}:${rel.name}`;
-          stubNodes.push({
-            id: stubId,
-            type: "relationStubNode",
-            position: { x: 0, y: 0 },
-            data: {
-              relation: rel,
-              sourceKey: node.key,
-              color: getModelColor(rel.class_name),
-              estimatedHeight: 50,
-            },
-          });
-          stubEdges.push({
-            id: `e:${node.key}->${stubId}`,
-            source: node.key,
-            target: stubId,
-            label: `${rel.name} (${rel.macro})`,
-            type: "smoothstep",
-            animated: false,
-            style: { stroke: getModelColor(rel.class_name), strokeWidth: 1.5 },
-          });
-        });
-
-        relayout([flowNode, ...stubNodes], stubEdges);
+        relayout([flowNode], []);
         setFocusNodeKey(node.key);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
@@ -179,17 +154,24 @@ export function useGraphState(): GraphNodes {
         let nodes = [...nodesSnapshot];
         let edges = [...edgesSnapshot];
 
-        // Remove the stub node for this relation
-        const stubId = `stub:${sourceKey}:${relation.name}`;
-        nodes = nodes.filter((n) => n.id !== stubId);
-        edges = edges.filter(
-          (e) => e.source !== stubId && e.target !== stubId
-        );
-
-        // Also remove any prior "load more" nodes for this relation
+        // Remove any prior "load more" nodes for this relation
         const loadMorePrefix = `more:${sourceKey}:${relation.name}:`;
         nodes = nodes.filter((n) => !n.id.startsWith(loadMorePrefix));
         edges = edges.filter((e) => !e.target.startsWith(loadMorePrefix));
+
+        // Update the source node's expandedRelations data
+        const sourceIdx = nodes.findIndex((n) => n.id === sourceKey);
+        if (sourceIdx !== -1) {
+          const sourceNode = nodes[sourceIdx];
+          const prevExpanded: string[] = (sourceNode.data as { expandedRelations?: string[] }).expandedRelations || [];
+          nodes[sourceIdx] = {
+            ...sourceNode,
+            data: {
+              ...sourceNode.data,
+              expandedRelations: [...prevExpanded, relation.name],
+            },
+          };
+        }
 
         result.nodes.forEach((instanceNode) => {
           instanceDataRef.current.set(instanceNode.key, instanceNode);
@@ -206,40 +188,9 @@ export function useGraphState(): GraphNodes {
             (n) => n.id === instanceNode.key
           );
           if (existingIdx === -1) {
-            // New node
+            // New node — no stubs, relations live inside the card
             const flowNode = instanceToFlowNode(instanceNode, nodeDepth);
             nodes.push(flowNode);
-
-            // Add stub nodes for this node's relations
-            instanceNode.relations.forEach((rel) => {
-              if (rel.count === 0) return;
-              const childStubId = `stub:${instanceNode.key}:${rel.name}`;
-              if (nodes.some((n) => n.id === childStubId)) return;
-
-              nodes.push({
-                id: childStubId,
-                type: "relationStubNode",
-                position: { x: 0, y: 0 },
-                data: {
-                  relation: rel,
-                  sourceKey: instanceNode.key,
-                  color: getModelColor(rel.class_name),
-                  estimatedHeight: 50,
-                },
-              });
-              edges.push({
-                id: `e:${instanceNode.key}->${childStubId}`,
-                source: instanceNode.key,
-                target: childStubId,
-                label: `${rel.name}`,
-                type: "smoothstep",
-                style: {
-                  stroke: getModelColor(rel.class_name),
-                  strokeWidth: 1,
-                  opacity: 0.5,
-                },
-              });
-            });
           }
 
           // Add edge from source to this node (deduplicated)
@@ -260,7 +211,7 @@ export function useGraphState(): GraphNodes {
           }
         });
 
-        // Add "load more" stub if there are more pages
+        // Add "load more" node if there are more pages
         if (result.has_more) {
           const moreId = `more:${sourceKey}:${relation.name}:${result.page + 1}`;
           nodes.push({

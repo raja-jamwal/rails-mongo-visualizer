@@ -10,13 +10,11 @@ import {
   type NodeMouseHandler,
 } from "@xyflow/react";
 import { ModelNode } from "./ModelNode";
-import { RelationStubNode } from "./RelationStubNode";
 import { LoadMoreNode } from "./LoadMoreNode";
 import type { RelationStub } from "../types";
 
 const nodeTypes = {
   modelNode: ModelNode,
-  relationStubNode: RelationStubNode,
   loadMoreNode: LoadMoreNode,
 };
 
@@ -44,13 +42,12 @@ export function InstanceGraph({
   useEffect(() => {
     if (!focusNodeKey) return;
 
-    // Small delay to let the layout settle
     const timer = setTimeout(() => {
       const node = nodes.find((n) => n.id === focusNodeKey);
       if (node) {
         const height = Number(node.data?.estimatedHeight) || 180;
         setCenter(
-          node.position.x + 140, // center of node (width ~280)
+          node.position.x + 140,
           node.position.y + height / 2,
           { zoom: Math.max(getZoom(), 0.6), duration: 400 }
         );
@@ -61,23 +58,32 @@ export function InstanceGraph({
     return () => clearTimeout(timer);
   }, [focusNodeKey, nodes, setCenter, getZoom, onFocusHandled]);
 
-  // Auto-fit when nodes first appear (initial load)
   useEffect(() => {
-    if (prevNodeCount.current === 0 && nodes.length > 0) {
-      // Initial load — fitView is handled by ReactFlow's fitView prop
-    }
     prevNodeCount.current = nodes.length;
   }, [nodes.length]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
-    (_event, node) => {
-      if (node.type === "relationStubNode") {
-        const { sourceKey, relation } = node.data as {
-          sourceKey: string;
-          relation: RelationStub;
-        };
-        onExpandRelation(sourceKey, relation);
-      } else if (node.type === "loadMoreNode") {
+    (event, node) => {
+      // Check if user clicked on a relation item inside the model node
+      const target = event.target as HTMLElement;
+      const relationEl = target.closest?.("[data-relation]") as HTMLElement | null;
+
+      if (relationEl && relationEl.classList.contains("relation-expandable")) {
+        const relationName = relationEl.getAttribute("data-relation");
+        const sourceKey = relationEl.getAttribute("data-source-key");
+
+        if (relationName && sourceKey && node.type === "modelNode") {
+          const relations = (node.data as { relations: RelationStub[] }).relations;
+          const rel = relations.find((r: RelationStub) => r.name === relationName);
+          if (rel) {
+            onExpandRelation(sourceKey, rel);
+          }
+        }
+        return;
+      }
+
+      // Handle load more node clicks
+      if (node.type === "loadMoreNode") {
         const { sourceKey, relation, nextPage } = node.data as {
           sourceKey: string;
           relation: RelationStub;

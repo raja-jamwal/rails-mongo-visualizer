@@ -8,10 +8,10 @@ interface ModelNodeData {
   record_id: string;
   attributes: Record<string, unknown>;
   relations: RelationStub[];
+  expandedRelations: string[]; // relation names already expanded
   depth: number;
   color: string;
   opacity: number;
-  onExpandRelation?: (sourceKey: string, relation: RelationStub) => void;
 }
 
 function truncateValue(val: unknown, maxLen = 40): string {
@@ -21,13 +21,19 @@ function truncateValue(val: unknown, maxLen = 40): string {
 }
 
 export const ModelNode = memo(({ data }: { data: ModelNodeData }) => {
-  const [showAll, setShowAll] = useState(false);
+  const [showAllAttrs, setShowAllAttrs] = useState(false);
+  const [showRelations, setShowRelations] = useState(false);
   const attrs = Object.entries(data.attributes);
-  const visibleAttrs = showAll ? attrs : attrs.slice(0, 6);
-  const hasMore = attrs.length > 6;
+  const visibleAttrs = showAllAttrs ? attrs : attrs.slice(0, 6);
+  const hasMoreAttrs = attrs.length > 6;
+
+  const expandedSet = new Set(data.expandedRelations || []);
+  const relationsWithData = data.relations.filter((r) => r.count > 0);
+  const expandableRelations = relationsWithData.filter((r) => !expandedSet.has(r.name));
 
   return (
     <div
+      className="model-node"
       style={{
         opacity: data.opacity,
         background: "#fff",
@@ -95,11 +101,11 @@ export const ModelNode = memo(({ data }: { data: ModelNodeData }) => {
             </span>
           </div>
         ))}
-        {hasMore && (
+        {hasMoreAttrs && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setShowAll(!showAll);
+              setShowAllAttrs(!showAllAttrs);
             }}
             style={{
               background: "none",
@@ -112,63 +118,114 @@ export const ModelNode = memo(({ data }: { data: ModelNodeData }) => {
               textAlign: "center",
             }}
           >
-            {showAll ? "Show less" : `+${attrs.length - 6} more attributes`}
+            {showAllAttrs ? "Show less" : `+${attrs.length - 6} more attributes`}
           </button>
         )}
       </div>
 
-      {/* Relations */}
-      {data.relations.length > 0 && (
-        <div
-          style={{
-            borderTop: "1px solid #e2e8f0",
-            padding: "4px 10px 6px",
-          }}
-        >
-          <div
+      {/* Relations toggle */}
+      {relationsWithData.length > 0 && (
+        <div style={{ borderTop: "1px solid #e2e8f0" }}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowRelations(!showRelations);
+            }}
             style={{
+              width: "100%",
+              background: "none",
+              border: "none",
+              padding: "5px 10px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
               fontSize: 10,
-              color: "#94A3B8",
+              color: "#64748B",
               textTransform: "uppercase",
-              letterSpacing: 1,
-              marginBottom: 2,
+              letterSpacing: 0.5,
+              fontWeight: 600,
             }}
           >
-            Relations
-          </div>
-          {data.relations.map((rel) => (
-            <div
-              key={rel.name}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "3px 0",
-              }}
-            >
-              <span style={{ color: "#475569", fontSize: 11 }}>
-                {rel.name}
-                <span style={{ color: "#94A3B8", fontSize: 10, marginLeft: 4 }}>
-                  {rel.macro === "belongs_to"
-                    ? "→1"
-                    : rel.macro === "has_one"
-                    ? "1←"
-                    : `←${rel.count}`}
-                </span>
-              </span>
-              <span
-                style={{
-                  background: "#f1f5f9",
-                  color: "#64748B",
-                  borderRadius: 4,
-                  padding: "1px 6px",
-                  fontSize: 10,
-                }}
-              >
-                {rel.class_name}
-              </span>
+            <span>
+              Relations ({expandableRelations.length} expandable
+              {expandedSet.size > 0 && `, ${expandedSet.size} loaded`})
+            </span>
+            <span style={{ fontSize: 12 }}>{showRelations ? "\u25B2" : "\u25BC"}</span>
+          </button>
+
+          {showRelations && (
+            <div style={{ padding: "0 10px 6px", maxHeight: 200, overflowY: "auto" }}>
+              {relationsWithData.map((rel) => {
+                const isExpanded = expandedSet.has(rel.name);
+                return (
+                  <div
+                    key={rel.name}
+                    data-relation={rel.name}
+                    data-source-key={data.key}
+                    className={isExpanded ? "relation-expanded" : "relation-expandable"}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "4px 6px",
+                      marginBottom: 2,
+                      borderRadius: 4,
+                      cursor: isExpanded ? "default" : "pointer",
+                      background: isExpanded ? "#f0fdf4" : "#f8fafc",
+                      border: isExpanded
+                        ? "1px solid #bbf7d0"
+                        : "1px solid #e2e8f0",
+                      transition: "all 0.15s",
+                      opacity: isExpanded ? 0.7 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isExpanded)
+                        (e.currentTarget as HTMLDivElement).style.background = "#eef2ff";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isExpanded)
+                        (e.currentTarget as HTMLDivElement).style.background = "#f8fafc";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: isExpanded ? "#22c55e" : data.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span style={{ color: "#334155", fontSize: 11, fontWeight: 500 }}>
+                        {rel.name}
+                      </span>
+                      <span style={{ color: "#94A3B8", fontSize: 10 }}>
+                        {rel.macro === "belongs_to"
+                          ? "\u21921"
+                          : rel.macro === "has_one" || rel.macro === "embeds_one"
+                          ? "1\u2190"
+                          : `\u2190${rel.count}`}
+                      </span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: isExpanded ? "#16a34a" : "#64748B",
+                        background: isExpanded ? "#dcfce7" : "#f1f5f9",
+                        borderRadius: 3,
+                        padding: "1px 5px",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {isExpanded ? "\u2713 loaded" : rel.class_name}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          )}
         </div>
       )}
 

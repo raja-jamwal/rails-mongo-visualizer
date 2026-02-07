@@ -19,7 +19,7 @@ export interface SchemaData {
 
 export interface RelationStub {
   name: string;
-  macro: "belongs_to" | "has_one" | "has_many" | "has_and_belongs_to_many";
+  macro: "belongs_to" | "has_one" | "has_many" | "has_and_belongs_to_many" | "embeds_many" | "embeds_one";
   class_name: string;
   foreign_key: string;
   value?: string | null;
