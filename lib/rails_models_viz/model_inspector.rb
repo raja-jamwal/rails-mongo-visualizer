@@ -25,7 +25,7 @@ module RailsModelsViz
                  end
 
         excluded = RailsModelsViz.configuration.excluded_models.map(&:to_s)
-        models.map(&:name).reject { |name| excluded.include?(name) }.sort
+        models.map(&:name).uniq.reject { |name| excluded.include?(name) }.sort
       end
 
       # Returns schema-level graph: all models with their relation definitions
