@@ -233,6 +233,8 @@ export default function App() {
                       edges={graph.flowEdges}
                       onNodesChange={graph.onNodesChange}
                       onExpandRelation={graph.expandRelation}
+                      focusNodeKey={graph.focusNodeKey}
+                      onFocusHandled={graph.clearFocus}
                     />
                   </ReactFlowProvider>
                 )}

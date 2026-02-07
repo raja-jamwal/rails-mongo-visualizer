@@ -21,6 +21,7 @@ export interface GraphNodes {
   loading: boolean;
   error: string | null;
   rootKey: string | null;
+  focusNodeKey: string | null;
   expandedRelations: Set<string>;
   loadRootNode: (model: string, id: string) => Promise<void>;
   expandRelation: (
@@ -33,6 +34,7 @@ export interface GraphNodes {
   exportGraph: () => SavedGraph;
   importGraph: (saved: SavedGraph) => string | null;
   clearGraph: () => void;
+  clearFocus: () => void;
 }
 
 const NODE_COLORS: Record<string, string> = {};
@@ -80,6 +82,7 @@ export function useGraphState(): GraphNodes {
   const [flowEdges, setFlowEdges] = useState<Edge[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusNodeKey, setFocusNodeKey] = useState<string | null>(null);
   const [rootKey, setRootKey] = useState<string | null>(null);
   const [expandedRelations, setExpandedRelations] = useState<Set<string>>(
     new Set()
@@ -139,6 +142,7 @@ export function useGraphState(): GraphNodes {
         });
 
         relayout([flowNode, ...stubNodes], stubEdges);
+        setFocusNodeKey(node.key);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -282,6 +286,11 @@ export function useGraphState(): GraphNodes {
         }
 
         relayout(nodes, edges);
+
+        // Focus on the first expanded node
+        if (result.nodes.length > 0) {
+          setFocusNodeKey(result.nodes[0].key);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -411,9 +420,16 @@ export function useGraphState(): GraphNodes {
     setFlowEdges([]);
     setRootKey(null);
     setExpandedRelations(new Set());
+    setFocusNodeKey(null);
     instanceDataRef.current = new Map();
     depthMapRef.current = new Map();
+    nodesSnapshot = [];
+    edgesSnapshot = [];
     setError(null);
+  }, []);
+
+  const clearFocus = useCallback(() => {
+    setFocusNodeKey(null);
   }, []);
 
   return {
@@ -422,6 +438,7 @@ export function useGraphState(): GraphNodes {
     loading,
     error,
     rootKey,
+    focusNodeKey,
     expandedRelations,
     loadRootNode,
     expandRelation,
@@ -430,6 +447,7 @@ export function useGraphState(): GraphNodes {
     exportGraph,
     importGraph,
     clearGraph,
+    clearFocus,
   };
 }
 

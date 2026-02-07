@@ -1,9 +1,10 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
+  useReactFlow,
   type Node,
   type Edge,
   type NodeMouseHandler,
@@ -23,7 +24,9 @@ interface InstanceGraphProps {
   nodes: Node[];
   edges: Edge[];
   onNodesChange: (changes: unknown[]) => void;
-  onExpandRelation: (sourceKey: string, relation: RelationStub, page?: number) => void;
+  onExpandRelation: (sourceKey: string, relation: RelationStub, page?: number) => Promise<void>;
+  focusNodeKey: string | null;
+  onFocusHandled: () => void;
 }
 
 export function InstanceGraph({
@@ -31,7 +34,41 @@ export function InstanceGraph({
   edges,
   onNodesChange,
   onExpandRelation,
+  focusNodeKey,
+  onFocusHandled,
 }: InstanceGraphProps) {
+  const { setCenter, getZoom } = useReactFlow();
+  const prevNodeCount = useRef(nodes.length);
+
+  // When focusNodeKey changes, pan to that node
+  useEffect(() => {
+    if (!focusNodeKey) return;
+
+    // Small delay to let the layout settle
+    const timer = setTimeout(() => {
+      const node = nodes.find((n) => n.id === focusNodeKey);
+      if (node) {
+        const height = Number(node.data?.estimatedHeight) || 180;
+        setCenter(
+          node.position.x + 140, // center of node (width ~280)
+          node.position.y + height / 2,
+          { zoom: Math.max(getZoom(), 0.6), duration: 400 }
+        );
+      }
+      onFocusHandled();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [focusNodeKey, nodes, setCenter, getZoom, onFocusHandled]);
+
+  // Auto-fit when nodes first appear (initial load)
+  useEffect(() => {
+    if (prevNodeCount.current === 0 && nodes.length > 0) {
+      // Initial load — fitView is handled by ReactFlow's fitView prop
+    }
+    prevNodeCount.current = nodes.length;
+  }, [nodes.length]);
+
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
       if (node.type === "relationStubNode") {
@@ -72,7 +109,7 @@ export function InstanceGraph({
         </svg>
         <div>Enter a model name and ID above to start exploring</div>
         <div style={{ fontSize: 12 }}>
-          Or click a model in the schema map to set the model name
+          Or click a model on the left to browse records
         </div>
       </div>
     );
