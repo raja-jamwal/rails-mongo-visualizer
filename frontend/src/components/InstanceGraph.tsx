@@ -7,6 +7,7 @@ import {
   useReactFlow,
   type Node,
   type Edge,
+  type NodeChange,
   type NodeMouseHandler,
 } from "@xyflow/react";
 import { ModelNode } from "./ModelNode";
@@ -21,7 +22,7 @@ const nodeTypes = {
 interface InstanceGraphProps {
   nodes: Node[];
   edges: Edge[];
-  onNodesChange: (changes: unknown[]) => void;
+  onNodesChange: (changes: NodeChange[]) => void;
   onExpandRelation: (sourceKey: string, relation: RelationStub, page?: number) => Promise<void>;
   focusNodeKey: string | null;
   onFocusHandled: () => void;

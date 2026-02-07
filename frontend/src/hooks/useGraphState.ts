@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type { Node, Edge } from "@xyflow/react";
+import { applyNodeChanges, type Node, type Edge, type NodeChange } from "@xyflow/react";
 import type {
   InstanceNode,
   RelationStub,
@@ -30,7 +30,7 @@ export interface GraphNodes {
     page?: number
   ) => Promise<void>;
   expandNode: (nodeKey: string) => Promise<void>;
-  onNodesChange: (changes: unknown[]) => void;
+  onNodesChange: (changes: NodeChange[]) => void;
   exportGraph: () => SavedGraph;
   importGraph: (saved: SavedGraph) => string | null;
   clearGraph: () => void;
@@ -267,18 +267,13 @@ export function useGraphState(): GraphNodes {
   );
 
   const onNodesChange = useCallback(
-    (changes: unknown[]) => {
+    (changes: NodeChange[]) => {
+      // Filter out remove changes so nodes can't be accidentally deleted
+      const safeChanges = changes.filter((c) => c.type !== "remove");
       setFlowNodes((nds) => {
-        // Handle position changes from dragging
-        const updated = [...nds];
-        (changes as Array<{ type: string; id: string; position?: { x: number; y: number }; dragging?: boolean }>).forEach((change) => {
-          if (change.type === "position" && change.position) {
-            const idx = updated.findIndex((n) => n.id === change.id);
-            if (idx !== -1) {
-              updated[idx] = { ...updated[idx], position: change.position };
-            }
-          }
-        });
+        const updated = applyNodeChanges(safeChanges, nds);
+        // Keep snapshots in sync for position changes
+        nodesSnapshot = updated;
         return updated;
       });
     },
