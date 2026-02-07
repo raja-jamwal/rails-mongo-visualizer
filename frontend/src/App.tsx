@@ -1,31 +1,73 @@
 import { useState, useCallback } from "react";
 import "@xyflow/react/dist/style.css";
 import { ReactFlowProvider } from "@xyflow/react";
+import type { Tab } from "./types";
 import { SearchBar } from "./components/SearchBar";
 import { Toolbar } from "./components/Toolbar";
-import { SchemaMap } from "./components/SchemaMap";
+import { ModelList } from "./components/ModelList";
+import { TabBar } from "./components/TabBar";
+import { TableView } from "./components/TableView";
 import { InstanceGraph } from "./components/InstanceGraph";
 import { useGraphState } from "./hooks/useGraphState";
 
 export default function App() {
   const graph = useGraphState();
-  const [selectedModel, setSelectedModel] = useState<string>("");
-  const [schemaCollapsed, setSchemaCollapsed] = useState(false);
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeTabKey, setActiveTabKey] = useState<string | null>(null);
 
-  const currentModel = graph.rootKey?.split(":")[0] || undefined;
+  const activeTab = tabs.find((t) => t.key === activeTabKey) || null;
 
-  const handleSchemaModelClick = useCallback(
-    (modelName: string) => {
-      setSelectedModel(modelName);
+  const openTableTab = useCallback(
+    (model: string) => {
+      const key = `table:${model}`;
+      setTabs((prev) => {
+        if (prev.some((t) => t.key === key)) return prev;
+        return [...prev, { type: "table", model, key }];
+      });
+      setActiveTabKey(key);
     },
     []
   );
 
-  const handleSearch = useCallback(
+  const openGraphTab = useCallback(
     (model: string, id: string) => {
+      const key = `graph:${model}:${id}`;
+      setTabs((prev) => {
+        if (prev.some((t) => t.key === key)) return prev;
+        return [...prev, { type: "graph", model, id, key }];
+      });
+      setActiveTabKey(key);
       graph.loadRootNode(model, id);
     },
     [graph]
+  );
+
+  const closeTab = useCallback(
+    (key: string) => {
+      setTabs((prev) => {
+        const next = prev.filter((t) => t.key !== key);
+        if (activeTabKey === key) {
+          setActiveTabKey(next.length > 0 ? next[next.length - 1].key : null);
+        }
+        return next;
+      });
+    },
+    [activeTabKey]
+  );
+
+  const handleSearch = useCallback(
+    (model: string, id: string) => {
+      openGraphTab(model, id);
+    },
+    [openGraphTab]
+  );
+
+  // When clicking a record row in table view, open it in graph view
+  const handleRecordClick = useCallback(
+    (model: string, id: string) => {
+      openGraphTab(model, id);
+    },
+    [openGraphTab]
   );
 
   return (
@@ -49,6 +91,7 @@ export default function App() {
           background: "#fff",
           borderBottom: "1px solid #e2e8f0",
           zIndex: 10,
+          flexShrink: 0,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -66,7 +109,6 @@ export default function App() {
           <SearchBar
             onSearch={handleSearch}
             loading={graph.loading}
-            initialModel={selectedModel}
           />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -84,81 +126,103 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content: Sidebar + Tabs/Content */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {/* Schema Map (left sidebar) */}
+        {/* Left Sidebar: Model List */}
         <div
           style={{
-            width: schemaCollapsed ? 36 : 280,
+            width: 220,
             borderRight: "1px solid #e2e8f0",
             background: "#fff",
+            flexShrink: 0,
             display: "flex",
             flexDirection: "column",
-            transition: "width 0.2s",
-            overflow: "hidden",
-            flexShrink: 0,
           }}
         >
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "6px 8px",
-              borderBottom: "1px solid #f1f5f9",
+              padding: "8px 12px",
+              borderBottom: "1px solid #e2e8f0",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#64748B",
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
             }}
           >
-            {!schemaCollapsed && (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "#64748B",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                }}
-              >
-                Schema Map
-              </span>
-            )}
-            <button
-              onClick={() => setSchemaCollapsed(!schemaCollapsed)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "#94A3B8",
-                fontSize: 16,
-                padding: "2px 4px",
-                lineHeight: 1,
-              }}
-              title={schemaCollapsed ? "Expand schema map" : "Collapse schema map"}
-            >
-              {schemaCollapsed ? "\u25B6" : "\u25C0"}
-            </button>
+            Models
           </div>
-          {!schemaCollapsed && (
-            <div style={{ flex: 1 }}>
-              <ReactFlowProvider>
-                <SchemaMap
-                  highlightedModel={currentModel}
-                  onModelClick={handleSchemaModelClick}
-                />
-              </ReactFlowProvider>
-            </div>
-          )}
+          <ModelList
+            onModelClick={openTableTab}
+            activeModel={
+              activeTab?.type === "table" ? activeTab.model : undefined
+            }
+          />
         </div>
 
-        {/* Instance Graph (main area) */}
-        <div style={{ flex: 1 }}>
-          <ReactFlowProvider>
-            <InstanceGraph
-              nodes={graph.flowNodes}
-              edges={graph.flowEdges}
-              onNodesChange={graph.onNodesChange}
-              onExpandRelation={graph.expandRelation}
-            />
-          </ReactFlowProvider>
+        {/* Right: Tab Bar + Content */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <TabBar
+            tabs={tabs}
+            activeTabKey={activeTabKey}
+            onTabClick={setActiveTabKey}
+            onTabClose={closeTab}
+          />
+
+          {/* Tab Content */}
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            {!activeTab && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  color: "#94A3B8",
+                  fontSize: 14,
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+                </svg>
+                <div>Click a model on the left to browse records</div>
+                <div style={{ fontSize: 12 }}>
+                  Or enter Model + ID above to explore the graph
+                </div>
+              </div>
+            )}
+
+            {tabs.map((tab) => (
+              <div
+                key={tab.key}
+                style={{
+                  display: tab.key === activeTabKey ? "flex" : "none",
+                  flexDirection: "column",
+                  height: "100%",
+                }}
+              >
+                {tab.type === "table" && (
+                  <TableView
+                    model={tab.model}
+                    onRecordClick={handleRecordClick}
+                  />
+                )}
+                {tab.type === "graph" && (
+                  <ReactFlowProvider>
+                    <InstanceGraph
+                      nodes={graph.flowNodes}
+                      edges={graph.flowEdges}
+                      onNodesChange={graph.onNodesChange}
+                      onExpandRelation={graph.expandRelation}
+                    />
+                  </ReactFlowProvider>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

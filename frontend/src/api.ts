@@ -1,7 +1,7 @@
 import type {
-  SchemaData,
   InstanceResponse,
   ExpandRelationResponse,
+  RecordsResponse,
 } from "./types";
 
 function apiBase(): string {
@@ -26,8 +26,14 @@ export async function fetchModels(): Promise<string[]> {
   return data.models;
 }
 
-export async function fetchSchema(): Promise<SchemaData> {
-  return fetchJson<SchemaData>(`${apiBase()}/schema`);
+export async function fetchRecords(
+  modelName: string,
+  page = 1,
+  perPage = 25
+): Promise<RecordsResponse> {
+  return fetchJson<RecordsResponse>(
+    `${apiBase()}/models/${encodeURIComponent(modelName)}/records?page=${page}&per_page=${perPage}`
+  );
 }
 
 export async function fetchInstance(

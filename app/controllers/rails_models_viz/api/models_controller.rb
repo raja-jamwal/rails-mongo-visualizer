@@ -13,6 +13,16 @@ module RailsModelsViz
         render json: ModelInspector.schema
       end
 
+      # GET /api/models/:model_name/records - paginated records for table view
+      def records
+        data = ModelInspector.list_records(
+          params[:model_name],
+          page: (params[:page] || 1).to_i,
+          per_page: (params[:per_page] || 25).to_i
+        )
+        render json: data
+      end
+
       # GET /api/models/:model_name/:id - instance node with lazy relations
       def show
         data = ModelInspector.inspect_instance(params[:model_name], params[:id])

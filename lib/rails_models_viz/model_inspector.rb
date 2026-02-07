@@ -87,6 +87,36 @@ module RailsModelsViz
         }
       end
 
+      # Returns paginated records for table view
+      def list_records(model_name, page: 1, per_page: 25)
+        klass = resolve_model(model_name)
+        offset = (page - 1) * per_page
+
+        total = klass.count
+        records = klass.order_by(_id: :desc).skip(offset).limit(per_page).to_a
+
+        columns = fields_for(klass).keys.first(30) # Cap columns for table view
+        columns.unshift("_id") unless columns.include?("_id")
+
+        rows = records.map do |record|
+          row = {}
+          columns.each do |col|
+            row[col] = serialize_value(record.attributes[col])
+          end
+          row
+        end
+
+        {
+          model: model_name,
+          columns: columns,
+          rows: rows,
+          total: total,
+          page: page,
+          per_page: per_page,
+          total_pages: (total.to_f / per_page).ceil
+        }
+      end
+
       # Expands a specific relation on a record, paginated
       def expand_relation(model_name, record_id, relation_name, page: 1, per_page: nil)
         per_page ||= RailsModelsViz.configuration.relation_limit

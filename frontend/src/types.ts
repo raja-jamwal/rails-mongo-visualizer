@@ -70,6 +70,20 @@ export interface SavedGraph {
   }>;
 }
 
+export interface RecordsResponse {
+  model: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+export type Tab =
+  | { type: "graph"; model: string; id: string; key: string }
+  | { type: "table"; model: string; key: string };
+
 declare global {
   interface Window {
     __RAILS_MODELS_VIZ__: {

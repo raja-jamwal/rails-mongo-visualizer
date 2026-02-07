@@ -4,12 +4,11 @@ import { fetchModels } from "../api";
 interface SearchBarProps {
   onSearch: (model: string, id: string) => void;
   loading: boolean;
-  initialModel?: string;
 }
 
-export function SearchBar({ onSearch, loading, initialModel }: SearchBarProps) {
+export function SearchBar({ onSearch, loading }: SearchBarProps) {
   const [models, setModels] = useState<string[]>([]);
-  const [model, setModel] = useState(initialModel || "");
+  const [model, setModel] = useState("");
   const [id, setId] = useState("");
   const [filtered, setFiltered] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -17,10 +16,6 @@ export function SearchBar({ onSearch, loading, initialModel }: SearchBarProps) {
   useEffect(() => {
     fetchModels().then(setModels).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (initialModel) setModel(initialModel);
-  }, [initialModel]);
 
   useEffect(() => {
     if (model.length > 0) {
