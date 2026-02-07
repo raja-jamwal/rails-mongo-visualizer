@@ -31,7 +31,7 @@ export interface GraphNodes {
   expandNode: (nodeKey: string) => Promise<void>;
   onNodesChange: (changes: unknown[]) => void;
   exportGraph: () => SavedGraph;
-  importGraph: (saved: SavedGraph) => void;
+  importGraph: (saved: SavedGraph) => string | null;
   clearGraph: () => void;
 }
 
@@ -394,10 +394,14 @@ export function useGraphState(): GraphNodes {
         style: { strokeWidth: 2 },
       }));
 
+      nodesSnapshot = nodes;
+      edgesSnapshot = edges;
       setFlowNodes(nodes);
       setFlowEdges(edges);
-      setRootKey(saved.root ? `${saved.root.model}:${saved.root.id}` : null);
+      const rk = saved.root ? `${saved.root.model}:${saved.root.id}` : null;
+      setRootKey(rk);
       setExpandedRelations(new Set(saved.expandedRelations));
+      return rk;
     },
     []
   );

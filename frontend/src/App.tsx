@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import "@xyflow/react/dist/style.css";
 import { ReactFlowProvider } from "@xyflow/react";
-import type { Tab } from "./types";
+import type { Tab, SavedGraph } from "./types";
 import { SearchBar } from "./components/SearchBar";
 import { Toolbar } from "./components/Toolbar";
 import { ModelList } from "./components/ModelList";
@@ -62,6 +62,22 @@ export default function App() {
     [openGraphTab]
   );
 
+  const handleImport = useCallback(
+    (saved: SavedGraph) => {
+      const rk = graph.importGraph(saved);
+      if (rk) {
+        const [model, id] = [rk.substring(0, rk.indexOf(":")), rk.substring(rk.indexOf(":") + 1)];
+        const key = `graph:${model}:${id}`;
+        setTabs((prev) => {
+          if (prev.some((t) => t.key === key)) return prev;
+          return [...prev, { type: "graph", model, id, key }];
+        });
+        setActiveTabKey(key);
+      }
+    },
+    [graph]
+  );
+
   // When clicking a record row in table view, open it in graph view
   const handleRecordClick = useCallback(
     (model: string, id: string) => {
@@ -119,7 +135,7 @@ export default function App() {
           )}
           <Toolbar
             onExport={graph.exportGraph}
-            onImport={graph.importGraph}
+            onImport={handleImport}
             onClear={graph.clearGraph}
             hasGraph={graph.flowNodes.length > 0}
           />
