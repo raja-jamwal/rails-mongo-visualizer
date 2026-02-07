@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rails Models Viz</title>
+  <link rel="stylesheet" href="/rails_models_viz/assets/index.css">
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    window.__RAILS_MODELS_VIZ__ = {
+      apiBase: '<%= rails_models_viz.root_path %>api'
+    };
+  </script>
+  <script type="module" src="/rails_models_viz/assets/app.js"></script>
+</body>
+</html>
