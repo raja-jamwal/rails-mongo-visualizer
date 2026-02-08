@@ -54,6 +54,42 @@ All endpoints are relative to the mount path (e.g., `/rails_models_viz`):
 | GET | `/api/schema` | Full schema graph (class-level nodes + edges) |
 | GET | `/api/models/:name/:id` | Instance node with attributes + lazy relation stubs |
 | GET | `/api/models/:name/:id/relations/:rel?page=1&per_page=5` | Expand a specific relation (paginated) |
+| POST | `/api/llm` | Send input to LLM (body: `{ "input": "..." }`) |
+
+## AI Comments
+
+Each node in the graph has a sparkle icon that opens a comments panel. You can add plain text comments or use the AI button to send the conversation (along with the node's attributes and relations as context) to an LLM. AI responses are rendered as Markdown.
+
+### Setup
+
+1. Create an `llm.sh` script and place it in `~/.local/bin/`:
+
+```bash
+#!/usr/bin/env bash
+cd /path/to/your/rails/project || exit 1
+
+if [ $# -gt 0 ]; then
+  claude --print "$*"
+else
+  claude --print "$(cat)"
+fi
+```
+
+2. Make it executable:
+
+```bash
+chmod +x ~/.local/bin/llm.sh
+```
+
+3. The controller automatically looks in `~/.local/bin`, `~/bin`, and `/usr/local/bin`. To use a custom command or path, configure it in your initializer:
+
+```ruby
+RailsModelsViz.configure do |config|
+  config.llm_command = "llm.sh"  # default; or use a full path
+end
+```
+
+The script receives the full comment thread via stdin and should print the response to stdout.
 
 ## Development
 

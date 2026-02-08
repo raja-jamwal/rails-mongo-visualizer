@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "rails-mcp": {
+      "url": "http://localhost:3001/mcp/rpc?token=fdf9ef6bd48e1551"
+    }
+  }
+}
+

@@ -35,6 +35,13 @@ export interface InstanceNode {
   relations: RelationStub[];
 }
 
+export interface Comment {
+  id: string;
+  text: string;
+  type: "user" | "ai";
+  timestamp: string;
+}
+
 export interface InstanceResponse {
   node: InstanceNode;
 }
@@ -68,6 +75,7 @@ export interface SavedGraph {
     relation: string;
     macro: string;
   }>;
+  comments?: Record<string, Comment[]>;
 }
 
 export interface RecordsResponse {

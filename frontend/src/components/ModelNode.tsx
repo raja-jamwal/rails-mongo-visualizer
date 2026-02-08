@@ -12,6 +12,7 @@ interface ModelNodeData {
   depth: number;
   color: string;
   opacity: number;
+  hasComments?: boolean;
 }
 
 function truncateValue(val: unknown, maxLen = 40): string {
@@ -62,11 +63,49 @@ export const ModelNode = memo(({ data }: { data: ModelNodeData }) => {
         }}
       >
         <span>{data.model}</span>
-        <span style={{ opacity: 0.8, fontSize: 11, fontFamily: "monospace" }}>
-          {data.record_id.length > 12
-            ? data.record_id.slice(0, 12) + "..."
-            : data.record_id}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            data-comment-btn
+            data-node-key={data.key}
+            title="Comments"
+            style={{
+              cursor: "pointer",
+              opacity: 0.85,
+              display: "flex",
+              alignItems: "center",
+              padding: "1px 3px",
+              borderRadius: 3,
+              transition: "opacity 0.15s",
+              position: "relative",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.85"; }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M8 1l1.5 3.5L13 6l-3.5 1.5L8 11 6.5 7.5 3 6l3.5-1.5z" />
+              <path d="M12 10l.75 1.75L14.5 12.5l-1.75.75L12 15l-.75-1.75-1.75-.75 1.75-.75z" opacity="0.6" />
+            </svg>
+            {data.hasComments && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -2,
+                  right: -2,
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: "#FACC15",
+                  border: "1.5px solid " + data.color,
+                }}
+              />
+            )}
+          </span>
+          <span style={{ opacity: 0.8, fontSize: 11, fontFamily: "monospace" }}>
+            {data.record_id.length > 12
+              ? data.record_id.slice(0, 12) + "..."
+              : data.record_id}
+          </span>
+        </div>
       </div>
 
       {/* Attributes */}

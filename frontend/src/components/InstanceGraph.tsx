@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -12,7 +12,8 @@ import {
 } from "@xyflow/react";
 import { ModelNode } from "./ModelNode";
 import { LoadMoreNode } from "./LoadMoreNode";
-import type { RelationStub } from "../types";
+import { CommentSidebar } from "./CommentSidebar";
+import type { Comment, InstanceNode, RelationStub } from "../types";
 
 const nodeTypes = {
   modelNode: ModelNode,
@@ -26,6 +27,10 @@ interface InstanceGraphProps {
   onExpandRelation: (sourceKey: string, relation: RelationStub, page?: number) => Promise<void>;
   focusNodeKey: string | null;
   onFocusHandled: () => void;
+  getComments: (nodeKey: string) => Comment[];
+  addComment: (nodeKey: string, text: string, type: "user" | "ai") => void;
+  getNodeData: (nodeKey: string) => InstanceNode | undefined;
+  nodeKeysWithComments: Set<string>;
 }
 
 export function InstanceGraph({
@@ -35,9 +40,25 @@ export function InstanceGraph({
   onExpandRelation,
   focusNodeKey,
   onFocusHandled,
+  getComments,
+  addComment,
+  getNodeData,
+  nodeKeysWithComments,
 }: InstanceGraphProps) {
   const { setCenter, getZoom } = useReactFlow();
   const prevNodeCount = useRef(nodes.length);
+  const [commentNodeKey, setCommentNodeKey] = useState<string | null>(null);
+
+  // Inject hasComments flag into node data so ModelNode can show the yellow dot
+  const augmentedNodes = useMemo(() => {
+    if (nodeKeysWithComments.size === 0) return nodes;
+    return nodes.map((n) => {
+      if (n.type !== "modelNode") return n;
+      const has = nodeKeysWithComments.has(n.id);
+      if (has === (n.data as { hasComments?: boolean }).hasComments) return n;
+      return { ...n, data: { ...n.data, hasComments: has } };
+    });
+  }, [nodes, nodeKeysWithComments]);
 
   // When focusNodeKey changes, pan to that node
   useEffect(() => {
@@ -65,8 +86,19 @@ export function InstanceGraph({
 
   const handleNodeClick: NodeMouseHandler = useCallback(
     (event, node) => {
-      // Check if user clicked on a relation item inside the model node
       const target = event.target as HTMLElement;
+
+      // Check if user clicked on the comment button
+      const commentBtn = target.closest?.("[data-comment-btn]") as HTMLElement | null;
+      if (commentBtn) {
+        const nodeKey = commentBtn.getAttribute("data-node-key");
+        if (nodeKey) {
+          setCommentNodeKey((prev) => (prev === nodeKey ? null : nodeKey));
+        }
+        return;
+      }
+
+      // Check if user clicked on a relation item inside the model node
       const relationEl = target.closest?.("[data-relation]") as HTMLElement | null;
 
       if (relationEl && relationEl.classList.contains("relation-expandable")) {
@@ -123,31 +155,43 @@ export function InstanceGraph({
   }
 
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      onNodesChange={onNodesChange}
-      onNodeClick={handleNodeClick}
-      fitView
-      fitViewOptions={{ padding: 0.3 }}
-      minZoom={0.1}
-      maxZoom={2}
-      proOptions={{ hideAttribution: true }}
-      defaultEdgeOptions={{
-        type: "smoothstep",
-      }}
-    >
-      <Background gap={20} size={1} color="#f1f5f9" />
-      <Controls position="bottom-right" />
-      <MiniMap
-        position="bottom-left"
-        nodeColor={(node) => {
-          if (node.type === "modelNode") return (node.data as { color: string }).color;
-          return "#CBD5E1";
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <ReactFlow
+        nodes={augmentedNodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onNodeClick={handleNodeClick}
+        fitView
+        fitViewOptions={{ padding: 0.3 }}
+        minZoom={0.1}
+        maxZoom={2}
+        proOptions={{ hideAttribution: true }}
+        defaultEdgeOptions={{
+          type: "smoothstep",
         }}
-        style={{ width: 120, height: 80 }}
-      />
-    </ReactFlow>
+      >
+        <Background gap={20} size={1} color="#f1f5f9" />
+        <Controls position="bottom-right" />
+        <MiniMap
+          position="bottom-left"
+          nodeColor={(node) => {
+            if (node.type === "modelNode") return (node.data as { color: string }).color;
+            return "#CBD5E1";
+          }}
+          style={{ width: 120, height: 80 }}
+        />
+      </ReactFlow>
+
+      {commentNodeKey && (
+        <CommentSidebar
+          nodeKey={commentNodeKey}
+          nodeData={getNodeData(commentNodeKey)}
+          comments={getComments(commentNodeKey)}
+          onAddComment={addComment}
+          onClose={() => setCommentNodeKey(null)}
+        />
+      )}
+    </div>
   );
 }

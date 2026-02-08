@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { applyNodeChanges, type Node, type Edge, type NodeChange } from "@xyflow/react";
 import type {
+  Comment,
   InstanceNode,
   RelationStub,
   SavedGraph,
@@ -35,6 +36,10 @@ export interface GraphNodes {
   importGraph: (saved: SavedGraph) => string | null;
   clearGraph: () => void;
   clearFocus: () => void;
+  getComments: (nodeKey: string) => Comment[];
+  addComment: (nodeKey: string, text: string, type: "user" | "ai") => void;
+  getNodeData: (nodeKey: string) => InstanceNode | undefined;
+  nodeKeysWithComments: Set<string>;
 }
 
 const NODE_COLORS: Record<string, string> = {};
@@ -94,6 +99,8 @@ export function useGraphState(): GraphNodes {
   // Track all instance data for export
   const instanceDataRef = useRef<Map<string, InstanceNode>>(new Map());
   const depthMapRef = useRef<Map<string, number>>(new Map());
+  const commentsRef = useRef<Map<string, Comment[]>>(new Map());
+  const [commentsVersion, setCommentsVersion] = useState(0);
 
   const relayout = useCallback((nodes: Node[], edges: Edge[]) => {
     const layouted = applyDagreLayout(nodes, edges);
@@ -308,6 +315,11 @@ export function useGraphState(): GraphNodes {
 
     const root = rootKey ? { model: splitKey(rootKey)[0], id: splitKey(rootKey)[1] } : null;
 
+    const comments: Record<string, Comment[]> = {};
+    commentsRef.current.forEach((list, key) => {
+      if (list.length > 0) comments[key] = list;
+    });
+
     return {
       version: 1,
       timestamp: new Date().toISOString(),
@@ -315,6 +327,7 @@ export function useGraphState(): GraphNodes {
       nodes: nodesList,
       expandedRelations: Array.from(expandedRelations),
       edges: edgesList,
+      comments,
     };
   }, [flowNodes, flowEdges, rootKey, expandedRelations]);
 
@@ -322,6 +335,13 @@ export function useGraphState(): GraphNodes {
     (saved: SavedGraph) => {
       instanceDataRef.current = new Map();
       depthMapRef.current = new Map();
+      commentsRef.current = new Map();
+      if (saved.comments) {
+        Object.entries(saved.comments).forEach(([key, list]) => {
+          commentsRef.current.set(key, list);
+        });
+      }
+      setCommentsVersion((v) => v + 1);
 
       const nodes: Node[] = saved.nodes.map((n, i) => {
         const instance: InstanceNode = {
@@ -369,6 +389,8 @@ export function useGraphState(): GraphNodes {
     setFocusNodeKey(null);
     instanceDataRef.current = new Map();
     depthMapRef.current = new Map();
+    commentsRef.current = new Map();
+    setCommentsVersion((v) => v + 1);
     nodesSnapshot = [];
     edgesSnapshot = [];
     setError(null);
@@ -377,6 +399,47 @@ export function useGraphState(): GraphNodes {
   const clearFocus = useCallback(() => {
     setFocusNodeKey(null);
   }, []);
+
+  const getComments = useCallback(
+    (nodeKey: string): Comment[] => {
+      // commentsVersion used to trigger re-reads
+      void commentsVersion;
+      return commentsRef.current.get(nodeKey) || [];
+    },
+    [commentsVersion]
+  );
+
+  const addComment = useCallback(
+    (nodeKey: string, text: string, type: "user" | "ai") => {
+      const list = commentsRef.current.get(nodeKey) || [];
+      list.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        text,
+        type,
+        timestamp: new Date().toISOString(),
+      });
+      commentsRef.current.set(nodeKey, list);
+      setCommentsVersion((v) => v + 1);
+    },
+    []
+  );
+
+  const getNodeData = useCallback(
+    (nodeKey: string): InstanceNode | undefined => {
+      return instanceDataRef.current.get(nodeKey);
+    },
+    []
+  );
+
+  // Derive set of node keys that have comments (recomputed when commentsVersion changes)
+  const nodeKeysWithComments = useMemo(() => {
+    void commentsVersion;
+    const keys = new Set<string>();
+    commentsRef.current.forEach((list, key) => {
+      if (list.length > 0) keys.add(key);
+    });
+    return keys;
+  }, [commentsVersion]);
 
   return {
     flowNodes,
@@ -394,6 +457,10 @@ export function useGraphState(): GraphNodes {
     importGraph,
     clearGraph,
     clearFocus,
+    getComments,
+    addComment,
+    getNodeData,
+    nodeKeysWithComments,
   };
 }
 

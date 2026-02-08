@@ -56,3 +56,16 @@ export async function expandRelation(
     `${apiBase()}/models/${encodeURIComponent(modelName)}/${encodeURIComponent(id)}/relations/${encodeURIComponent(relationName)}?page=${page}&per_page=${perPage}`
   );
 }
+
+export async function callLlm(input: string): Promise<string> {
+  const res = await fetch(`${apiBase()}/llm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+  return data.response;
+}

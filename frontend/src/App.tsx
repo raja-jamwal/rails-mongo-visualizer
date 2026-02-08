@@ -235,6 +235,10 @@ export default function App() {
                       onExpandRelation={graph.expandRelation}
                       focusNodeKey={graph.focusNodeKey}
                       onFocusHandled={graph.clearFocus}
+                      getComments={graph.getComments}
+                      addComment={graph.addComment}
+                      getNodeData={graph.getNodeData}
+                      nodeKeysWithComments={graph.nodeKeysWithComments}
                     />
                   </ReactFlowProvider>
                 )}

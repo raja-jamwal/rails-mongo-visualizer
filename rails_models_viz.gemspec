@@ -5,10 +5,10 @@ require_relative "lib/rails_models_viz/version"
 Gem::Specification.new do |spec|
   spec.name = "rails_models_viz"
   spec.version = RailsModelsViz::VERSION
-  spec.authors = ["LeadGenie"]
+  spec.authors = ["Raja Jamwal"]
   spec.summary = "Interactive model relationship visualizer for Rails applications"
   spec.description = "A mountable Rails engine that provides an interactive graph visualization of your models, their attributes, and relationships. Supports both ActiveRecord and Mongoid."
-  spec.homepage = "https://github.com/leadgenie/rails-models-viz"
+  spec.homepage = "https://github.com/raja-jamwal/rails-mongo-visualizerz"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.0"
 

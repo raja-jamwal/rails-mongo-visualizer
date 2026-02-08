@@ -9,5 +9,6 @@ RailsModelsViz::Engine.routes.draw do
     get "models/:model_name/records", to: "models#records", as: :model_records
     get "models/:model_name/:id", to: "models#show", as: :model_instance
     get "models/:model_name/:id/relations/:relation_name", to: "models#relation", as: :model_relation
+    post "llm", to: "llm#create"
   end
 end
